@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>NCAA Women's Basketball Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%23FF6720'/><g fill='none' stroke='%23111' stroke-width='3'><path d='M2 32h60M32 2v60M11 11c12 10 12 32 0 42M53 11c-12 10-12 32 0 42'/></g></svg>" />
+<style>
+  :root {
+    --accent: #00A3DE;        /* NCAA wordmark blue (ncaa.com) */
+    --accent-dark: #006699;
+    --bg: #000000;
+    --card: #ffffff;
+    --border: #e3e3e8;
+    --muted: #6b6b73;
+    --text: #1a1a1a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+  .header-card {
+    background: #fff; border-radius: 10px; padding: 16px 20px; margin-bottom: 18px;
+    max-width: 1200px; box-shadow: 0 1px 2px rgba(0,0,0,0.2); position: relative;
+  }
+  h1.title { font-size: 32px; font-weight: 900; margin: 0 0 4px 0; letter-spacing: -0.5px; }
+  h1.title .ncaa-logo { height: 23px; width: auto; vertical-align: -3px; margin-right: 10px; }
+  h1.title .accent { color: var(--accent); margin-right: 8px; }
+  h1.title .dash { color: #111; }
+  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+  .page-footer { max-width: 1200px; margin: 20px auto 6px; padding: 0 8px; text-align: center; color: rgba(255,255,255,0.45); font-size: 11px; line-height: 1.4; }
+  .version { position: absolute; bottom: 10px; right: 16px; font-size: 10px; color: var(--muted); }
+
+  .picker-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; border-top: 1px solid var(--border); padding-top: 14px; }
+  .picker { display: flex; flex-direction: column; gap: 6px; min-width: 220px; }
+  .picker label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); }
+  select, input[type="text"], input[type="date"] {
+    font-family: inherit; font-size: 14px; padding: 8px 10px; border-radius: 7px;
+    border: 1px solid var(--border); background: #fff; color: var(--text);
+  }
+  .fav-picker { position: relative; flex: 1; min-width: 260px; }
+  .fav-input-wrap { display: flex; gap: 8px; align-items: center; }
+  .fav-suggest {
+    position: absolute; top: 100%; left: 0; right: 0; background: #fff;
+    border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    max-height: 240px; overflow-y: auto; z-index: 20; margin-top: 4px; display: none;
+  }
+  .fav-suggest.open { display: block; }
+  .fav-suggest-item { padding: 7px 10px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+  .fav-suggest-item:hover { background: #f2f2f5; }
+  .fav-suggest-item img { width: 18px; height: 18px; object-fit: contain; }
+  .fav-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .fav-chip {
+    display: flex; align-items: center; gap: 6px; background: #f2f2f5; border: 1px solid var(--border);
+    border-radius: 999px; padding: 4px 6px 4px 10px; font-size: 12px; font-weight: 700;
+  }
+  .fav-chip img { width: 16px; height: 16px; object-fit: contain; }
+  .fav-chip .chip-drag { cursor: grab; color: var(--muted); opacity: 0.55; font-size: 12px; line-height: 1; touch-action: none; margin-right: -2px; }
+  .fav-chip .chip-drag:active { cursor: grabbing; }
+  .fav-chip.chip-ghost { opacity: 0.4; }
+  .fav-chip .rm { cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #e2e2e8; color: #555; font-weight: 900; font-size: 12px; line-height: 1; }
+  .fav-chip .rm:hover { background: #c00; color: #fff; }
+  .fav-empty-note { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .board-top { max-width: 1200px; margin: 0 0 14px; }
+  .board-top:empty { min-height: 26px; border: 1px dashed rgba(255,255,255,0.18); border-radius: 8px; }
+  .board-grid { display: grid; grid-template-columns: 60% calc(40% - 14px); gap: 14px; max-width: 1200px; margin: 0; align-items: start; }
+  .board-col { display: flex; flex-direction: column; gap: 14px; min-height: 60px; min-width: 0; }
+  .section, .section-body { min-width: 0; }
+  @media (max-width: 900px) { .board-grid { grid-template-columns: 1fr; } }
+  .section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+  .section-header {
+    display: flex; align-items: center; padding: 8px 14px; cursor: pointer; user-select: none;
+    background: var(--accent); color: #0a2a38; gap: 10px; flex-wrap: wrap;
+  }
+  .section-header:hover { filter: brightness(0.96); }
+  .section-title { font-weight: 800; font-size: 16px; flex: 1; color: #0a2a38; }
+  .section-count { font-size: 13px; font-weight: 700; color: #0a2a38; opacity: 0.8; }
+  .chevron { transition: transform 0.2s; color: #0a2a38; }
+  .section.collapsed .chevron { transform: rotate(-90deg); }
+  .section.collapsed .section-body { display: none; }
+  .section-body { padding: 14px 16px; }
+  .drag-handle { cursor: grab; padding: 6px 8px 6px 0; margin: -6px 0; color: #0a2a38; opacity: 0.6; font-size: 18px; line-height: 1; touch-action: none; }
+  .drag-handle:active { cursor: grabbing; }
+  .section.dragging { opacity: 0.6; }
+  .section.drag-ghost { opacity: 0.3; }
+  .loading, .empty, .err { color: var(--muted); font-style: italic; font-size: 14px; }
+  .err { color: #c00; font-style: normal; }
+
+  .subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+  .subtab-btn {
+    font-family: inherit; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--border); background: #fff; color: var(--text); cursor: pointer;
+  }
+  .subtab-btn.active { background: #111; color: #fff; border-color: #111; }
+  .date-nav { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+  /* ---- WNBA-style game cards ---- */
+  .game-card { background: #fff; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 14px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.07); }
+  .game-card:last-child { margin-bottom: 0; }
+  .game-card-header {
+    background: #111; color: #fff; padding: 9px 12px; display: flex; align-items: center; gap: 8px;
+    font-weight: 700; font-size: 15px; flex-wrap: wrap;
+  }
+  .game-card-header .gc-team { display: inline-flex; align-items: center; gap: 5px; }
+  .game-card-header img { width: 20px; height: 20px; object-fit: contain; }
+  .game-card-header .team-link { color: #fff; }
+  .game-card-header .score { color: #fff; font-variant-numeric: tabular-nums; font-weight: 800; }
+  .game-card-header .at { color: rgba(255,255,255,0.6); font-weight: 400; margin: 0 2px; }
+  .game-card-header .gc-rank { font-size: 10px; font-weight: 800; color: var(--accent); margin-right: 1px; }
+  .game-card-header .spacer { flex: 1; }
+  .game-card-header .gc-status { font-size: 13px; font-weight: 700; }
+  .game-card-header .gc-status.live { color: #ff6b6b; }
+  .game-card-header .gc-status.final { color: rgba(255,255,255,0.7); }
+  .game-card-header .box-link { color: #fff; opacity: 0.85; font-size: 12px; cursor: pointer; font-weight: 700; }
+  .game-card-header .box-link:hover { opacity: 1; text-decoration: underline; }
+  .game-meta-info { background: #fafafc; padding: 7px 12px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .game-meta-info .att-icon { vertical-align: -3px; margin-right: 4px; opacity: 0.85; }
+  .game-meta-info .meta-sep { color: var(--border); margin: 0 5px; }
+  .venue-link { color: var(--accent-dark); font-weight: 600; text-decoration: none; }
+  .venue-link:hover { text-decoration: underline; }
+  .officials-line { font-size: 11.5px; color: var(--muted); }
+  .broadcast-tag { font-size: 11px; color: var(--muted); }
+  .gc-leaders { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 8px 12px 10px; font-size: 12.5px; }
+  .gc-leaders .lead-col { min-width: 130px; }
+  .gc-leaders .lead-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); font-weight: 700; }
+  .gc-leaders .lead-val { font-weight: 600; }
+  .gc-leaders .lead-val b { color: var(--text); }
+
+  .team-link { text-decoration: none; font-weight: 600; color: inherit; cursor: pointer; }
+  .team-link:hover { text-decoration: underline; }
+
+  /* ---- Standings (black ribbon labels, WNBA look) ---- */
+  .conf-ribbon {
+    background: #111; color: #fff; font-weight: 800; font-size: 13px; text-transform: uppercase;
+    letter-spacing: 0.6px; padding: 8px 12px; border-radius: 6px; margin: 16px 0 8px;
+    display: flex; align-items: center; gap: 9px;
+  }
+  .conf-ribbon:first-child { margin-top: 0; }
+  .conf-ribbon-logo { height: 22px; width: 22px; object-fit: contain; background: #fff; border-radius: 4px; padding: 2px; flex: none; }
+  .title-ico { width: 18px; height: 18px; vertical-align: -3px; margin-right: 4px; }
+  .note-line { font-size: 12px; color: var(--muted); margin: 2px 0 10px; line-height: 1.5; }
+  table.std-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.std-table th { text-align: left; font-size: 11px; text-transform: uppercase; color: var(--muted); border-bottom: 2px solid #111; padding: 6px 8px; }
+  table.std-table td { padding: 7px 8px; border-bottom: 1px solid #efeff3; }
+  table.std-table th.num, table.std-table td.num { text-align: right; }
+  table.std-table tr:last-child td { border-bottom: none; }
+  table.std-table tr.is-fav { background: #eaf3fb; }
+  .rank-num { color: var(--muted); font-variant-numeric: tabular-nums; width: 24px; display: inline-block; }
+
+  /* ---- Rankings ---- */
+  .rank-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #efeff3; font-size: 14px; }
+  .rank-row:last-child { border-bottom: none; }
+  .rank-row .rk { font-weight: 800; color: var(--accent-dark); width: 24px; text-align: right; }
+  .rank-row img { width: 22px; height: 22px; object-fit: contain; }
+  .rank-row .trend { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+  .my-team-card { border: 1px solid var(--border); border-radius: 8px; padding: 8px 11px; margin-bottom: 8px; }
+  .my-team-card:last-child { margin-bottom: 0; }
+  .my-team-head { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 8px; font-weight: 800; font-size: 15px; }
+  .my-team-head img { width: 20px; height: 20px; object-fit: contain; }
+  .my-team-standing { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  .mt-drag { cursor: grab; color: var(--muted); opacity: 0.5; font-size: 16px; line-height: 1; touch-action: none; }
+  .mt-drag:active { cursor: grabbing; }
+  .mt-remove { margin-left: auto; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #e2e2e8; color: #555; font-weight: 900; font-size: 14px; line-height: 1; flex: none; }
+  .mt-remove:hover { background: #c00; color: #fff; }
+  .my-team-card.mt-ghost { opacity: 0.4; }
+  .my-team-next { font-size: 12.5px; color: var(--text); margin-top: 3px; }
+
+  .news-item { padding: 9px 0; border-bottom: 1px solid #efeff3; font-size: 14px; }
+  .news-item:last-child { border-bottom: none; }
+  .news-item a { color: var(--text); text-decoration: none; font-weight: 600; }
+  .news-item a:hover { text-decoration: underline; }
+  .news-date { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+  /* ---- Modals ---- */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; z-index: 100; }
+  .modal-overlay.open { display: flex; }
+  .modal-box { background: #fff; border-radius: 10px; max-width: 520px; width: 100%; padding: 18px 20px; position: relative; }
+  .modal-box.wide { max-width: 860px; }
+  .modal-close { position: absolute; top: 2px; right: 2px; cursor: pointer; font-size: 22px; color: var(--muted); font-weight: 700; padding: 12px; line-height: 1; }
+  .modal-close:hover { color: #000; }
+  .modal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .modal-head img { width: 34px; height: 34px; object-fit: contain; }
+  .modal-head h2 { margin: 0; font-size: 20px; }
+  .modal-sub { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+  .modal-section-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); margin: 14px 0 6px; }
+  .modal-links a, .modal-links .team-link { font-size: 12.5px; color: var(--accent-dark); text-decoration: none; margin-right: 12px; }
+  .modal-links a:hover { text-decoration: underline; }
+  .roster-list { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; font-size: 13.5px; }
+  .roster-list .num { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 6px; }
+  a.player-link { color: var(--text); text-decoration: none; }
+  a.player-link:hover { color: var(--accent-dark); text-decoration: underline; }
+  .result-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #efeff3; font-size: 13px; }
+  .result-row:last-child { border-bottom: none; }
+  .result-row .rw { font-weight: 800; width: 16px; text-align: center; }
+  .result-row .rw.win { color: #0a7d3c; }
+  .result-row .rw.loss { color: #c00; }
+  .result-row .ropp { flex: 1; }
+  .result-row .rscore { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .record-link { cursor: pointer; }
+  .record-link:hover { text-decoration: underline; color: var(--accent-dark); }
+  /* full schedule modal */
+  .sch-list { margin-top: 4px; }
+  .sch-row { display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #efeff3; font-size: 13.5px; }
+  .sch-row:last-child { border-bottom: none; }
+  .sch-date { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+  .sch-opp { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .sch-opp img { width: 18px; height: 18px; object-fit: contain; flex: none; }
+  .sch-vs { color: var(--muted); width: 16px; display: inline-block; flex: none; }
+  .sch-right { display: flex; align-items: center; gap: 8px; justify-content: flex-end; white-space: nowrap; }
+  .sch-right .rw { font-weight: 800; }
+  .sch-right .rw.win { color: #0a7d3c; } .sch-right .rw.loss { color: #c00; }
+  .sch-right .rscore { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .sch-time { font-variant-numeric: tabular-nums; }
+  .sch-tv { color: var(--muted); font-size: 12px; }
+  .sch-box { color: var(--accent-dark); cursor: pointer; font-weight: 700; font-size: 11px; }
+  .sch-box:hover { text-decoration: underline; }
+
+  /* box score modal */
+  .box-header { display: flex; align-items: center; justify-content: center; gap: 24px; margin-bottom: 4px; }
+  .box-header .bh-team { display: flex; flex-direction: column; align-items: center; gap: 4px; font-weight: 800; font-size: 15px; text-align: center; }
+  .box-header .bh-team img { width: 40px; height: 40px; object-fit: contain; }
+  .box-header .bh-score { font-size: 30px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .box-header .bh-score.win { color: var(--accent-dark); }
+  .box-meta-line { text-align: center; font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+  .box-meta-line a { color: var(--accent-dark); }
+  .box-team-block { margin-bottom: 18px; }
+  .box-team-title { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 14px; margin-bottom: 6px; }
+  .box-team-title img { width: 20px; height: 20px; object-fit: contain; }
+  .stat-table-wrap { overflow-x: auto; }
+  table.stat-table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+  table.stat-table th, table.stat-table td { padding: 4px 6px; text-align: center; }
+  table.stat-table th { color: var(--muted); font-weight: 700; font-size: 10.5px; text-transform: uppercase; border-bottom: 2px solid #111; }
+  table.stat-table td:nth-child(1) { text-align: left; font-weight: 600; }
+  table.stat-table tr:not(:last-child) td { border-bottom: 1px solid #efeff3; }
+  table.stat-table tr.tot-row td { font-weight: 800; border-top: 2px solid #111; border-bottom: none; }
+  .box-source-note { font-size: 11px; color: var(--muted); margin-top: 8px; text-align: center; }
+
+  @media (max-width: 700px) { .roster-list { grid-template-columns: 1fr; } .picker { min-width: 0; width: 100%; } }
+  @media (max-width: 480px) {
+    body { padding: 10px; }
+    .board-top:empty, .board-col:empty { display: none; }
+    .header-card { padding: 14px 14px; }
+    h1.title { font-size: 24px; }
+    h1.title .ncaa-logo { height: 19px; vertical-align: -2px; margin-right: 8px; }
+    .board-col { gap: 10px; }
+    .section-header { padding: 12px 12px; }
+    .section-body { padding: 12px; }
+    select, input[type="text"], input[type="date"] { font-size: 16px; }
+    .drag-handle { padding: 10px 10px 10px 0; margin: -10px 0; font-size: 20px; }
+    .subtab-btn { padding: 8px 12px; }
+    .date-nav input[type="date"] { max-width: 150px; }
+    .modal-overlay { padding: 16px 8px; align-items: center; }
+    .modal-box { padding: 16px 14px; max-height: 92vh; overflow-y: auto; }
+    .box-header { gap: 12px; }
+    table.stat-table { font-size: 11px; }
+    .fav-chip .rm { padding: 6px; margin: -6px -2px -6px 0; }
+    .team-link, .record-link, .box-link { padding: 2px 0; display: inline-block; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header-card">
+  <h1 class="title"><svg class="ncaa-logo" viewBox="0 0 85 22" role="img" aria-label="NCAA" xmlns="http://www.w3.org/2000/svg"><path d="M80.174 0H67.709l-1.47 5.026h1.94l-6.152 9.436L61.166 0H48.54L47.1 5.002l1.93.024-8.25 12.114-6.792-.028c-.71 0-3.472-.639-3.472-3.923 0-3.285 3.257-8.073 6.54-8.073l1.385.034c-.233.81-.722 2.49-.722 2.49h6.047L45.94 0h-9.324c-5.79 0-10.467 4.006-11.947 8.137L27.088 0h-8.294l-1.459 5.026h2.143l-2.155 7.352L11.88 0H4.144L2.686 5.026h2.128L0 22h6.2l3.01-10.578C10.1 13.466 13.735 22 13.735 22h6.903l3.156-10.786a14.304 14.304 0 000 4.947C24.4 19.693 27.95 22 31.823 22h12.528l2.166-3.163h8.838L55.554 22h7.796l2.02-3.163h9.046L74.773 22h6.944L80.174 0zM50.07 13.594l4.81-7.064.259 7.064h-5.07zm19.254-.095l4.795-7.027.246 7.027h-5.04zm13.716 7.444a.841.841 0 01.16-.471c.1-.139.24-.245.402-.307a.915.915 0 01.96.2.832.832 0 01.182.933.866.866 0 01-.327.381.908.908 0 01-.49.144.906.906 0 01-.637-.258.85.85 0 01-.25-.622zM83.927 22a1.11 1.11 0 00.6-.185c.177-.117.314-.283.394-.476a1.023 1.023 0 00-.244-1.143 1.123 1.123 0 00-1.184-.224c-.198.08-.368.215-.487.387a1.03 1.03 0 00.138 1.337 1.089 1.089 0 00.783.304zm-.23-.975h.22l.332.529h.211l-.356-.535a.325.325 0 00.235-.1.303.303 0 00.08-.236c0-.241-.145-.345-.442-.345h-.48v1.222h.19l.01-.535zm0-.156v-.375h.264c.133 0 .272.027.272.177s-.142.198-.316.198h-.22z" fill="#00A3DE"/></svg><span class="dash">Women's Basketball</span></h1>
+  <div class="subtitle" id="subtitle">Loading…</div>
+
+  <div class="picker-row">
+    <div class="picker">
+      <label for="confSelect">Conference filter</label>
+      <select id="confSelect"></select>
+    </div>
+    <div class="picker" id="confTeamPicker" style="display:none;">
+      <label for="confTeamSelect">Add favorite from conference</label>
+      <select id="confTeamSelect"><option value="">Select a team…</option></select>
+    </div>
+    <div class="picker fav-picker">
+      <label for="favInput">Favorite teams</label>
+      <div class="fav-input-wrap">
+        <input type="text" id="favInput" placeholder="Search a team to add…" autocomplete="off" />
+      </div>
+      <div class="fav-suggest" id="favSuggest"></div>
+    </div>
+  </div>
+</div>
+
+<div class="board-top board-col" id="boardTop"></div>
+<div class="board-grid">
+<div class="board-col" id="boardLeft">
+
+  <div class="section" id="sec-myteams" data-key="myteams">
+    <div class="section-header" onclick="toggleSection(event, 'sec-myteams')">
+      <span class="drag-handle">⠿</span><span class="chevron">▾</span>
+      <span class="section-title"><svg class="title-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>My Teams</span>
+    </div>
+    <div class="section-body" id="body-myteams"><div class="loading">Add a favorite team above to see it here.</div></div>
+  </div>
+
+  <div class="section" id="sec-scores" data-key="scores">
+    <div class="section-header" onclick="toggleSection(event, 'sec-scores')">
+      <span class="drag-handle">⠿</span><span class="chevron">▾</span>
+      <span class="section-title"><svg class="title-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9.2"/><path d="M3 12h18M12 2.8v18.4M5.5 5.5c3.4 3 3.4 10 0 13M18.5 5.5c-3.4 3-3.4 10 0 13"/></svg>Scores</span>
+      <span class="section-count" id="scoresCount"></span>
+    </div>
+    <div class="section-body">
+      <div class="subtabs">
+        <button class="subtab-btn" data-range="yesterday" onclick="setScoreRange('yesterday')">Yesterday</button>
+        <button class="subtab-btn" data-range="today" onclick="setScoreRange('today')">Today</button>
+        <button class="subtab-btn" data-range="tomorrow" onclick="setScoreRange('tomorrow')">Tomorrow</button>
+        <div class="date-nav"><input type="date" id="customDate" onchange="setScoreRange('custom')" /></div>
+      </div>
+      <div id="body-scores"><div class="loading">Loading scores…</div></div>
+    </div>
+  </div>
+
+  <div class="section" id="sec-rankings" data-key="rankings">
+    <div class="section-header" onclick="toggleSection(event, 'sec-rankings')">
+      <span class="drag-handle">⠿</span><span class="chevron">▾</span>
+      <span class="section-title"><svg class="title-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19 3h-2V1H7v2H5c-1.1 0-2 .9-2 2v2c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 11.63 21 9.55 21 7V5c0-1.1-.9-2-2-2zM5 7V5h2v4.82C5.84 9.4 5 8.3 5 7zm14 0c0 1.3-.84 2.4-2 2.82V5h2v2z"/></svg>Rankings</span>
+    </div>
+    <div class="section-body">
+      <div class="subtabs" id="pollTabs"></div>
+      <div id="body-rankings"><div class="loading">Loading rankings…</div></div>
+    </div>
+  </div>
+
+  </div>
+  <div class="board-col" id="boardRight">
+
+  <div class="section" id="sec-standings" data-key="standings">
+    <div class="section-header" onclick="toggleSection(event, 'sec-standings')">
+      <span class="drag-handle">⠿</span><span class="chevron">▾</span>
+      <span class="section-title"><svg class="title-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 13h5v8H3zm13 2h5v6h-5zM9.5 7h5v14h-5z"/></svg>Standings</span>
+    </div>
+    <div class="section-body">
+      <div style="margin-bottom:12px;">
+        <select id="standingsConfSelect" onclick="event.stopPropagation()"></select>
+      </div>
+      <div id="body-standings"><div class="empty">Pick a conference to view its standings.</div></div>
+    </div>
+  </div>
+
+  <div class="section" id="sec-news" data-key="news">
+    <div class="section-header" onclick="toggleSection(event, 'sec-news')">
+      <span class="drag-handle">⠿</span><span class="chevron">▾</span>
+      <span class="section-title"><svg class="title-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20 3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-9 14H5v-2h6v2zm0-4H5v-2h6v2zm0-4H5V7h6v2zm8 8h-6v-2h6v2zm0-4h-6v-2h6v2zm0-4h-6V7h6v2z"/></svg>News</span>
+    </div>
+    <div class="section-body">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;margin-bottom:10px;cursor:pointer;" onclick="event.stopPropagation()">
+        <input type="checkbox" id="newsMyTeamsOnly" onchange="onNewsFilterChange()"> Only show my favorite teams
+      </label>
+      <div id="body-news"><div class="loading">Loading news…</div></div>
+    </div>
+  </div>
+
+  </div>
+</div>
+
+<footer class="page-footer">Data via ESPN public APIs. Not affiliated with the NCAA or ESPN. Built for personal use.</footer>
+
+<div class="modal-overlay" id="teamModal" onclick="if(event.target===this) closeModal()">
+  <div class="modal-box"><span class="modal-close" onclick="closeModal()">&times;</span>
+    <div id="modalBody"><div class="loading">Loading team…</div></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="boxModal" onclick="if(event.target===this) closeBoxModal()">
+  <div class="modal-box wide"><span class="modal-close" onclick="closeBoxModal()">&times;</span>
+    <div id="boxModalBody"><div class="loading">Loading box score…</div></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="scheduleModal" onclick="if(event.target===this) closeSchedule()">
+  <div class="modal-box"><span class="modal-close" onclick="closeSchedule()">&times;</span>
+    <div id="scheduleModalBody"><div class="loading">Loading schedule…</div></div>
+  </div>
+</div>
+
+<script>
+const API = 'https://site.api.espn.com/apis/site/v2/sports/basketball/womens-college-basketball';
+const CORE_API = 'https://site.api.espn.com/apis/v2/sports/basketball/womens-college-basketball';
+const ESPN_SITE = 'https://www.espn.com/womens-college-basketball';
+
+// D1 conference group ids -> ESPN names (captured 2026-27 season from standings?level=3).
+const CONFERENCES = [
+  { id: '1', name: 'America East Conference' },
+  { id: '62', name: 'American Conference' },
+  { id: '3', name: 'Atlantic 10 Conference' },
+  { id: '2', name: 'Atlantic Coast Conference' },
+  { id: '46', name: 'Atlantic Sun Conference' },
+  { id: '8', name: 'Big 12 Conference' },
+  { id: '4', name: 'Big East Conference' },
+  { id: '5', name: 'Big Sky Conference' },
+  { id: '6', name: 'Big South Conference' },
+  { id: '7', name: 'Big Ten Conference' },
+  { id: '9', name: 'Big West Conference' },
+  { id: '10', name: 'Coastal Athletic Association' },
+  { id: '11', name: 'Conference USA' },
+  { id: '45', name: 'Horizon League' },
+  { id: '12', name: 'Ivy League' },
+  { id: '13', name: 'Metro Atlantic (MAAC)' },
+  { id: '14', name: 'Mid-American Conference' },
+  { id: '16', name: 'Mid-Eastern (MEAC)' },
+  { id: '18', name: 'Missouri Valley Conference' },
+  { id: '44', name: 'Mountain West Conference' },
+  { id: '19', name: 'Northeast Conference' },
+  { id: '20', name: 'Ohio Valley Conference' },
+  { id: '22', name: 'Patriot League' },
+  { id: '23', name: 'Southeastern Conference' },
+  { id: '24', name: 'Southern Conference' },
+  { id: '25', name: 'Southland Conference' },
+  { id: '26', name: 'Southwestern (SWAC)' },
+  { id: '47', name: 'Summit League' },
+  { id: '27', name: 'Sun Belt Conference' },
+  { id: '30', name: 'United Athletic Conference' },
+  { id: '29', name: 'West Coast Conference' },
+].sort((a, b) => a.name.localeCompare(b.name));
+const confLabel = (name) => name.replace(/ Conference$/, '');
+
+// Conference logos (group id -> ESPN href), from the core API. Metro (13) & UAC (30) have none.
+const CONF_LOGOS = {
+  '1':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/america_east.png',
+  '62':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/american.png',
+  '3':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/atlantic_10.png',
+  '2':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/acc.png',
+  '46':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/atlantic_sun.png',
+  '8':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/big_12.png',
+  '4':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/big_east.png',
+  '5':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/big_sky.png',
+  '6':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/big_south.png',
+  '7':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/big_ten.png',
+  '9':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/big_west.png',
+  '10':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/coastal.png',
+  '11':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/conference_usa.png',
+  '45':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/horizon.png',
+  '12':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/ivy.png',
+  '14':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/mid_american.png',
+  '16':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/meac.png',
+  '18':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/missouri_valley.png',
+  '44':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/mountain_west.png',
+  '19':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/northeast.png',
+  '20':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/ohio_valley.png',
+  '22':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/patriot_league.png',
+  '23':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/sec.png',
+  '24':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/southern.png',
+  '25':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/southland.png',
+  '26':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/swac.png',
+  '47':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/summit_league.png',
+  '27':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/sun_belt.png',
+  '29':'https://a.espncdn.com/i/teamlogos/ncaa_conf/500/west_coast.png',
+};
+
+let TEAM_CACHE = null;         // [{id,name,abbr,logo,color}]
+let STANDINGS_TREE = null;     // cached standings?level=3 children (conferences w/ entries)
+let FAVORITES = loadJSON('wbb_favorites', []);
+let SELECTED_CONF = localStorage.getItem('wbb_conf') || '';
+let SCORE_RANGE = 'today';
+const EVENT_CACHE = {};
+const SUMMARY_CACHE = {};      // eventId -> summary json (for box scores)
+
+function loadJSON(key, fallback) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; } }
+function saveJSON(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
+function escAttr(s) { return String(s == null ? '' : s).replace(/"/g, '&quot;'); }
+
+// ---------- collapse + drag-reorder ----------
+function toggleSection(event, id) {
+  if (event && event.target.closest('.drag-handle')) return;
+  const section = document.getElementById(id);
+  section.classList.toggle('collapsed');
+  const collapsed = loadJSON('wbb_collapsed', {});
+  collapsed[section.dataset.key] = section.classList.contains('collapsed');
+  saveJSON('wbb_collapsed', collapsed);
+}
+function applySavedCollapsed() {
+  const collapsed = loadJSON('wbb_collapsed', {});
+  document.querySelectorAll('.section').forEach(s => { if (s.dataset.key in collapsed) s.classList.toggle('collapsed', collapsed[s.dataset.key]); });
+}
+// Three drop zones: full-width top, then a left/right grid. Sections drag between them.
+const BOARD_COLS = ['boardTop', 'boardLeft', 'boardRight'];
+const LAYOUT_KEY = 'wbb_layout';
+function applySavedLayout() {
+  const saved = loadJSON(LAYOUT_KEY, null);
+  if (!saved) return;
+  const cols = BOARD_COLS.map(id => document.getElementById(id));
+  const all = {};
+  cols.forEach(col => [...col.children].forEach(c => { all[c.dataset.key] = c; }));
+  cols.forEach(col => (saved[col.id] || []).forEach(k => { if (all[k]) col.appendChild(all[k]); }));
+}
+function saveLayout() {
+  const layout = {};
+  BOARD_COLS.forEach(id => { layout[id] = [...document.getElementById(id).children].map(c => c.dataset.key); });
+  saveJSON(LAYOUT_KEY, layout);
+}
+function wireSortable() {
+  BOARD_COLS.forEach(id => {
+    Sortable.create(document.getElementById(id), {
+      group: 'wbb-board', handle: '.drag-handle', animation: 150, ghostClass: 'drag-ghost', dragClass: 'dragging',
+      delay: 200, delayOnTouchOnly: true, touchStartThreshold: 4, onEnd: saveLayout,
+    });
+  });
+}
+
+// ---------- date helpers ----------
+function ymd(d) { return d.getFullYear().toString() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0'); }
+function fmtDateHeading(d) { return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }); }
+function fmtTime(iso) { return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago', timeZoneName: 'short' }); }
+// Before this date, treat the season as not-yet-started: standings/rankings reset.
+// (2026-27 D1 WBB opens early Nov; ESPN keeps last season's data visible until then.)
+const SEASON_OPENER = new Date('2026-11-01T00:00:00');
+function isPreseason() { return new Date() < SEASON_OPENER; }
+
+// Pull a broadcast/streaming label from a competition, handling ESPN's varied shapes.
+function tvFromComp(comp) {
+  if (!comp) return '';
+  const names = [];
+  (comp.broadcasts || []).forEach(x => {
+    if (Array.isArray(x.names)) names.push(...x.names);
+    else if (x.media?.shortName) names.push(x.media.shortName);
+    else if (x.shortName) names.push(x.shortName);
+  });
+  (comp.geoBroadcasts || []).forEach(g => { if (g.media?.shortName) names.push(g.media.shortName); });
+  return [...new Set(names.filter(Boolean))].join('/');
+}
+
+// "Sat, Nov 2 · 6:30 PM CST · 📺 ESPN2" — TBD when ESPN hasn't set a tip time.
+function nextWhen(ev) {
+  const c = ev.competitions?.[0];
+  const d = new Date(ev.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const when = c && c.timeValid === false ? 'TBD' : fmtTime(ev.date);
+  const tv = tvFromComp(c);
+  return `${d} · ${when}${tv ? ` · 📺 ${tv}` : ''}`;
+}
+
+async function fetchJSON(url) { const r = await fetch(url); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
+
+// ---------- team directory + standings tree (one standings?level=3 call) ----------
+async function ensureStandingsTree() {
+  if (STANDINGS_TREE) return STANDINGS_TREE;
+  const data = await fetchJSON(`${CORE_API}/standings?level=3`);
+  STANDINGS_TREE = data.children || [];
+  return STANDINGS_TREE;
+}
+async function ensureTeamCache() {
+  if (TEAM_CACHE) return TEAM_CACHE;
+  const cached = loadJSON('wbb_team_cache', null);
+  const cachedAt = localStorage.getItem('wbb_team_cache_at');
+  const fresh = cachedAt && (Date.now() - Number(cachedAt) < 1000 * 60 * 60 * 24 * 3);
+  if (cached && fresh) { TEAM_CACHE = cached; return TEAM_CACHE; }
+  try {
+    const tree = await ensureStandingsTree();
+    const byId = new Map();
+    tree.forEach(conf => (conf.standings?.entries || []).forEach(en => {
+      const t = en.team;
+      if (!byId.has(t.id)) byId.set(t.id, {
+        id: t.id, name: t.displayName, abbr: t.abbreviation,
+        logo: t.logos?.[0]?.href || '', color: t.color ? ('#' + t.color) : '#333',
+      });
+    }));
+    TEAM_CACHE = Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
+    saveJSON('wbb_team_cache', TEAM_CACHE);
+    localStorage.setItem('wbb_team_cache_at', String(Date.now()));
+  } catch (e) { TEAM_CACHE = cached || []; }
+  return TEAM_CACHE;
+}
+
+// ---------- favorites ----------
+const favInput = document.getElementById('favInput');
+const favSuggest = document.getElementById('favSuggest');
+favInput.addEventListener('input', onFavInput);
+favInput.addEventListener('focus', onFavInput);
+document.addEventListener('click', (e) => { if (!e.target.closest('.fav-picker')) favSuggest.classList.remove('open'); });
+async function onFavInput() {
+  const q = favInput.value.trim().toLowerCase();
+  const teams = await ensureTeamCache();
+  if (!q) { favSuggest.classList.remove('open'); return; }
+  const favIds = new Set(FAVORITES.map(f => f.id));
+  const matches = teams.filter(t => !favIds.has(t.id) && (t.name.toLowerCase().includes(q) || (t.abbr || '').toLowerCase().includes(q))).slice(0, 8);
+  favSuggest.innerHTML = matches.length
+    ? matches.map(t => `<div class="fav-suggest-item" onclick="addFavorite('${t.id}')"><img src="${t.logo}" onerror="this.style.display='none'"><span>${t.name}</span></div>`).join('')
+    : `<div class="fav-suggest-item" style="cursor:default;color:var(--muted);">No matches</div>`;
+  favSuggest.classList.add('open');
+}
+async function addFavorite(teamId) {
+  const teams = await ensureTeamCache();
+  const t = teams.find(x => x.id === teamId);
+  if (!t || FAVORITES.some(f => f.id === teamId)) return;
+  FAVORITES.push(t); saveJSON('wbb_favorites', FAVORITES);
+  favInput.value = ''; favSuggest.classList.remove('open');
+  renderFavChips(); loadMyTeams(); renderNews(); populateConfTeamSelect(); if (!SELECTED_CONF) loadScores();
+}
+function removeFavorite(teamId) {
+  FAVORITES = FAVORITES.filter(f => f.id !== teamId); saveJSON('wbb_favorites', FAVORITES);
+  renderFavChips(); loadMyTeams(); renderNews(); populateConfTeamSelect(); if (!SELECTED_CONF) loadScores();
+}
+function renderFavChips() { /* favorites now live in the My Teams section, not header chips */ }
+// Drag-to-reorder favorite teams inside the My Teams section.
+let MYTEAMS_SORTABLE = null;
+function wireMyTeamsSortable() {
+  if (MYTEAMS_SORTABLE) return;
+  MYTEAMS_SORTABLE = Sortable.create(document.getElementById('body-myteams'), {
+    handle: '.mt-drag', draggable: '.my-team-card', animation: 150, ghostClass: 'mt-ghost',
+    delay: 150, delayOnTouchOnly: true, touchStartThreshold: 5,
+    onEnd: () => {
+      const ids = [...document.querySelectorAll('#body-myteams .my-team-card')].map(c => c.dataset.id);
+      FAVORITES.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+      saveJSON('wbb_favorites', FAVORITES);
+    },
+  });
+}
+
+// ---------- conference picker (synced) ----------
+const confSelect = document.getElementById('confSelect');
+const standingsConfSelect = document.getElementById('standingsConfSelect');
+const confOptionsHtml = CONFERENCES.map(c => `<option value="${c.id}">${confLabel(c.name)}</option>`).join('');
+confSelect.innerHTML = `<option value="">All (Ranked &amp; Favorites)</option>` + confOptionsHtml;
+standingsConfSelect.innerHTML = `<option value="">Pick a conference…</option>` + confOptionsHtml;
+confSelect.value = SELECTED_CONF; standingsConfSelect.value = SELECTED_CONF;
+function setConference(newConf) {
+  SELECTED_CONF = newConf; localStorage.setItem('wbb_conf', SELECTED_CONF);
+  confSelect.value = SELECTED_CONF; standingsConfSelect.value = SELECTED_CONF;
+  loadScores(); loadStandings(); populateConfTeamSelect();
+}
+confSelect.addEventListener('change', () => setConference(confSelect.value));
+standingsConfSelect.addEventListener('change', () => setConference(standingsConfSelect.value));
+
+// Conference team quick-add dropdown: lists the picked conference's teams to favorite.
+const confTeamPicker = document.getElementById('confTeamPicker');
+const confTeamSelect = document.getElementById('confTeamSelect');
+confTeamSelect.addEventListener('change', () => {
+  const id = confTeamSelect.value;
+  if (id) { addFavorite(id); confTeamSelect.value = ''; }
+});
+async function populateConfTeamSelect() {
+  if (!SELECTED_CONF) { confTeamPicker.style.display = 'none'; return; }
+  try {
+    const tree = await ensureStandingsTree();
+    const conf = tree.find(c => String(c.id) === String(SELECTED_CONF));
+    const favIds = new Set(FAVORITES.map(f => f.id));
+    const teams = (conf?.standings?.entries || []).map(en => en.team)
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+    confTeamSelect.innerHTML = `<option value="">Select a team…</option>` +
+      teams.map(t => `<option value="${t.id}"${favIds.has(t.id) ? ' disabled' : ''}>${t.displayName}${favIds.has(t.id) ? ' ★' : ''}</option>`).join('');
+    confTeamPicker.style.display = teams.length ? 'flex' : 'none';
+  } catch (e) { confTeamPicker.style.display = 'none'; }
+}
+
+// ---------- My Teams ----------
+async function loadMyTeams() {
+  const body = document.getElementById('body-myteams');
+  if (!FAVORITES.length) { body.innerHTML = `<div class="empty">Add a favorite team above to see it here.</div>`; return; }
+  body.innerHTML = `<div class="loading">Loading your teams…</div>`;
+  try {
+    const results = await Promise.all(FAVORITES.map(async f => {
+      try { const data = await fetchJSON(`${API}/teams/${f.id}`); return { fav: f, team: data.team }; }
+      catch (e) { return { fav: f, team: null }; }
+    }));
+    body.innerHTML = results.map(({ fav, team }) => {
+      if (!team) return `<div class="my-team-card"><div class="my-team-head">${fav.name}</div><div class="err">Couldn't load team data.</div></div>`;
+      const next = team.nextEvent?.[0];
+      let nextHtml = '<span style="color:var(--muted);">No upcoming game scheduled</span>';
+      if (next) nextHtml = `${next.shortName || next.name} — ${nextWhen(next)}`;
+      const standing = team.standingSummary || team.recordSummary || '';
+      return `<div class="my-team-card" data-id="${team.id}">
+        <div class="my-team-head"><span class="mt-drag" title="Drag to reorder">⠿</span><img src="${team.logos?.[0]?.href||''}" onerror="this.style.display='none'">
+          <span class="team-link" onclick="openTeamModal('${team.id}')">${team.displayName}</span>${standing ? `<span class="my-team-standing">· ${standing}</span>` : ''}
+          <span class="mt-remove" title="Remove from favorites" onclick="removeFavorite('${team.id}')">&times;</span></div>
+        <div class="my-team-next">Next: ${nextHtml}</div></div>`;
+    }).join('');
+  } catch (e) { body.innerHTML = `<div class="err">Error loading your teams: ${e.message}</div>`; }
+}
+
+// ---------- Scores (WNBA-style game cards) ----------
+function setScoreRange(range) {
+  SCORE_RANGE = range;
+  document.querySelectorAll('.subtab-btn[data-range]').forEach(b => b.classList.toggle('active', b.dataset.range === range));
+  loadScores();
+}
+function scoreDateForRange() {
+  const d = new Date();
+  if (SCORE_RANGE === 'yesterday') d.setDate(d.getDate() - 1);
+  if (SCORE_RANGE === 'tomorrow') d.setDate(d.getDate() + 1);
+  if (SCORE_RANGE === 'custom') { const v = document.getElementById('customDate').value; if (v) return new Date(v + 'T12:00:00'); }
+  return d;
+}
+let RANKED_IDS_CACHE = null;
+async function getRankedTeamIds() {
+  if (RANKED_IDS_CACHE) return RANKED_IDS_CACHE;
+  try {
+    const data = await fetchJSON(`${API}/rankings`);
+    const ranks = data.rankings?.[0]?.ranks || [];
+    RANKED_IDS_CACHE = new Set(ranks.map(r => String(r.team.id)));
+  } catch (e) { RANKED_IDS_CACHE = new Set(); }
+  return RANKED_IDS_CACHE;
+}
+async function loadScores() {
+  const body = document.getElementById('body-scores');
+  const countEl = document.getElementById('scoresCount');
+  body.innerHTML = `<div class="loading">Loading scores…</div>`; countEl.textContent = '';
+  const d = scoreDateForRange(); const dateStr = ymd(d);
+  try {
+    let url = `${API}/scoreboard?dates=${dateStr}&limit=400`;
+    if (SELECTED_CONF) url += `&groups=${SELECTED_CONF}`;
+    const data = await fetchJSON(url);
+    let events = data.events || [];
+    const rawCount = events.length;
+    let narrowed = false;
+    if (!SELECTED_CONF) {
+      const rankIds = await getRankedTeamIds();
+      const favIds = new Set(FAVORITES.map(f => f.id));
+      events = events.filter(e => e.competitions?.[0]?.competitors?.some(c => rankIds.has(String(c.team.id)) || favIds.has(String(c.team.id))));
+      narrowed = true;
+    }
+    // live first, then upcoming, then finals; within, by start time
+    const order = { in: 0, pre: 1, post: 2 };
+    events.sort((x, y) => {
+      const sx = order[x.status?.type?.state] ?? 3, sy = order[y.status?.type?.state] ?? 3;
+      if (sx !== sy) return sx - sy;
+      return new Date(x.date) - new Date(y.date);
+    });
+    events.forEach(e => { EVENT_CACHE[e.id] = e; });
+    countEl.textContent = events.length ? `${events.length}` : '';
+    if (!events.length) {
+      const msg = rawCount === 0
+        ? `ESPN lists no games on ${fmtDateHeading(d)}.`
+        : `No ranked or favorite games on ${fmtDateHeading(d)} — ${rawCount} other game${rawCount === 1 ? '' : 's'} that day. Pick a conference above to see a full slate.`;
+      body.innerHTML = `<div class="empty">${msg}</div>`;
+      return;
+    }
+    const heading = `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">${fmtDateHeading(d)}${narrowed ? ' — ranked &amp; favorite games' : ''}</div>`;
+    body.innerHTML = heading + events.map(renderGameCard).join('');
+  } catch (e) { body.innerHTML = `<div class="err">Error loading scores: ${e.message}</div>`; }
+}
+
+const ATT_ICON = '<svg class="att-icon" viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>';
+
+function teamInHeader(c) {
+  const rank = c.curatedRank && c.curatedRank.current && c.curatedRank.current <= 25 ? `<span class="gc-rank">#${c.curatedRank.current}</span>` : '';
+  const logo = c.team.logo ? `<img src="${c.team.logo}" onerror="this.style.display='none'">` : '';
+  return `<span class="gc-team">${rank}${logo}<span class="team-link" onclick="openTeamModal('${c.team.id}')">${c.team.shortDisplayName || c.team.abbreviation || c.team.displayName}</span></span>`;
+}
+function renderGameCard(e) {
+  const comp = e.competitions[0];
+  const home = comp.competitors.find(c => c.homeAway === 'home') || comp.competitors[0];
+  const away = comp.competitors.find(c => c.homeAway === 'away') || comp.competitors[1];
+  const state = comp.status?.type?.state;
+  const isFinal = state === 'post', isLive = state === 'in';
+  const showScore = isFinal || isLive;
+  const scoreHtml = (c) => showScore ? ` <span class="score">${c.score ?? ''}</span>` : '';
+  let statusHtml = '';
+  if (isLive) statusHtml = `<span class="gc-status live">● ${comp.status?.type?.shortDetail || 'Live'}</span>`;
+  else if (isFinal) statusHtml = `<span class="gc-status final">Final${comp.status?.type?.shortDetail && /ot/i.test(comp.status.type.shortDetail) ? '/OT' : ''}</span>`;
+  else statusHtml = `<span class="gc-status" style="color:rgba(255,255,255,.75)">${comp.timeValid === false ? 'TBD' : fmtTime(comp.date).replace(/:00/, '')}</span>`;
+  const boxLink = (isFinal || isLive) ? `<span class="box-link" onclick="openBoxScore('${e.id}')">Box Score</span>` : '';
+
+  // meta line: venue (+wiki), attendance, officials, broadcast
+  const venue = comp.venue;
+  const venueName = venue?.fullName;
+  const city = venue?.address ? [venue.address.city, venue.address.state].filter(Boolean).join(', ') : '';
+  const bits = [];
+  if (venueName) bits.push(`<a class="venue-link" href="https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(venueName)}&go=Go" target="_blank" rel="noopener">${venueName}</a>${city ? ' · ' + city : ''}`);
+  const att = Number(comp.attendance) || 0;
+  if (att > 0) bits.push(`${ATT_ICON}${att.toLocaleString()}`);
+  const broadcast = tvFromComp(comp);
+  if (broadcast) bits.push(`📺 ${broadcast}`);
+  const metaHtml = bits.length ? `<div class="game-meta-info">${bits.join('<span class="meta-sep">·</span>')}</div>` : '';
+
+  return `<div class="game-card" data-gameid="${e.id}">
+    <div class="game-card-header">
+      ${teamInHeader(away)}${scoreHtml(away)}<span class="at">@</span>${teamInHeader(home)}${scoreHtml(home)}
+      <span class="spacer"></span>${statusHtml}${boxLink ? ' ' + boxLink : ''}
+    </div>
+    ${metaHtml}
+  </div>`;
+}
+
+// ---------- Rankings (AP + Coaches) ----------
+let RANKINGS_DATA = null, ACTIVE_POLL = 0;
+async function loadRankings() {
+  const body = document.getElementById('body-rankings');
+  try {
+    const data = await fetchJSON(`${API}/rankings`);
+    RANKINGS_DATA = (data.rankings || []).filter(r => (r.ranks || []).length);
+    if (!RANKINGS_DATA.length) { body.innerHTML = `<div class="empty">No rankings posted yet (preseason polls usually arrive in late October).</div>`; document.getElementById('pollTabs').innerHTML = ''; return; }
+    document.getElementById('pollTabs').innerHTML = RANKINGS_DATA.map((r, i) =>
+      `<button class="subtab-btn ${i === ACTIVE_POLL ? 'active' : ''}" onclick="setPoll(${i})">${r.shortName || r.name}</button>`).join('');
+    renderRankings();
+  } catch (e) { body.innerHTML = `<div class="err">Error loading rankings: ${e.message}</div>`; }
+}
+function setPoll(i) { ACTIVE_POLL = i; document.querySelectorAll('#pollTabs .subtab-btn').forEach((b, idx) => b.classList.toggle('active', idx === i)); renderRankings(); }
+function renderRankings() {
+  const body = document.getElementById('body-rankings');
+  const poll = RANKINGS_DATA[ACTIVE_POLL];
+  if (!poll) { body.innerHTML = `<div class="empty">No rankings available.</div>`; return; }
+  // If it's still preseason but ESPN is handing back last season's final poll
+  // (teams show real records), don't present it as current.
+  const firstRec = (poll.ranks[0]?.recordSummary || '').match(/(\d+)\D+(\d+)/);
+  const gamesPlayed = firstRec ? (Number(firstRec[1]) + Number(firstRec[2])) : 0;
+  if (isPreseason() && gamesPlayed > 0) {
+    body.innerHTML = `<div class="note-line">Preseason — the 2026-27 ${poll.shortName || poll.name} hasn't been released yet. Preseason polls usually post in late October, and this updates automatically once they do.</div>`;
+    return;
+  }
+  body.innerHTML = poll.ranks.map(r => `<div class="rank-row">
+      <span class="rk">${r.current}</span>
+      <img src="${r.team.logos?.[0]?.href||''}" onerror="this.style.display='none'">
+      <span class="team-link" onclick="openTeamModal('${r.team.id}')">${r.team.location || r.team.name}</span>
+      <span class="trend record-link" onclick="openTeamModal('${r.team.id}')" title="See recent results">${r.recordSummary || ''}${r.trend && r.trend !== '-' ? ' (' + r.trend + ')' : ''}</span>
+    </div>`).join('');
+}
+
+// ---------- Standings ----------
+async function loadStandings() {
+  const body = document.getElementById('body-standings');
+  if (!SELECTED_CONF) { body.innerHTML = `<div class="empty">Pick a conference to view its standings.</div>`; return; }
+  body.innerHTML = `<div class="loading">Loading standings…</div>`;
+  try {
+    const tree = await ensureStandingsTree();
+    const conf = tree.find(c => String(c.id) === String(SELECTED_CONF));
+    const entries = (conf?.standings?.entries || []).slice();
+    if (!entries.length) { body.innerHTML = `<div class="empty">No standings available for this conference yet.</div>`; return; }
+    const favIds = new Set(FAVORITES.map(f => f.id));
+    const stat = (en, name) => en.stats.find(s => s.name === name || s.type === name);
+    const sv = (en, name) => { const s = stat(en, name); return s ? (s.displayValue ?? s.value ?? '-') : '-'; };
+    const nv = (en, name) => { const s = stat(en, name); return s ? Number(s.value) : 0; };
+    const pre = isPreseason();
+    if (pre) {
+      entries.sort((x, y) => x.team.displayName.localeCompare(y.team.displayName));
+    } else {
+      entries.sort((x, y) => {
+        const wx = nv(x, 'winPercent'), wy = nv(y, 'winPercent');
+        if (wy !== wx) return wy - wx;
+        return nv(y, 'wins') - nv(x, 'wins');
+      });
+    }
+    const confName = conf.name;
+    const confLogo = CONF_LOGOS[String(SELECTED_CONF)];
+    const preNote = pre ? `<div class="note-line">Preseason — every team starts 0-0; records fill in once the season tips off Nov 1.</div>` : '';
+    body.innerHTML = `<div class="conf-ribbon">${confLogo ? `<img class="conf-ribbon-logo" src="${confLogo}" onerror="this.style.display='none'">` : ''}<span>${confName}</span></div>
+      ${preNote}<table class="std-table"><thead><tr>
+        <th>#</th><th>Team</th><th class="num">Overall</th><th class="num">Conf</th><th class="num">Win%</th><th class="num">Strk</th>
+      </tr></thead><tbody>` +
+      entries.map((en, i) => {
+        const t = en.team; const isFav = favIds.has(t.id);
+        const overall = pre ? '0-0' : (sv(en, 'overall') !== '-' ? sv(en, 'overall') : `${sv(en,'wins')}-${sv(en,'losses')}`);
+        const confRec = pre ? '0-0' : (sv(en, 'vs. Conf.') !== '-' ? sv(en, 'vs. Conf.') : (sv(en, 'vsConf') !== '-' ? sv(en, 'vsConf') : '-'));
+        const winPct = pre ? '—' : sv(en, 'winPercent');
+        const strk = pre ? '—' : sv(en, 'streak');
+        return `<tr class="${isFav ? 'is-fav' : ''}">
+          <td class="rank-num">${i + 1}</td>
+          <td><img src="${t.logos?.[0]?.href||''}" style="width:16px;height:16px;object-fit:contain;vertical-align:-3px;margin-right:6px;" onerror="this.style.display='none'">
+            <span class="team-link" onclick="openTeamModal('${t.id}')">${t.displayName}</span></td>
+          <td class="num record-link" onclick="openTeamModal('${t.id}')" title="See recent results">${overall}</td>
+          <td class="num">${confRec}</td>
+          <td class="num">${winPct}</td>
+          <td class="num">${strk}</td>
+        </tr>`;
+      }).join('') + `</tbody></table>`;
+  } catch (e) { body.innerHTML = `<div class="err">Error loading standings: ${e.message}</div>`; }
+}
+
+// ---------- News ----------
+let NEWS_CACHE = null;
+const newsToggle = document.getElementById('newsMyTeamsOnly');
+newsToggle.checked = localStorage.getItem('wbb_news_myteams') === '1';
+function onNewsFilterChange() { localStorage.setItem('wbb_news_myteams', newsToggle.checked ? '1' : '0'); renderNews(); }
+async function loadNews() {
+  const body = document.getElementById('body-news');
+  body.innerHTML = `<div class="loading">Loading news…</div>`;
+  try { const data = await fetchJSON(`${API}/news?limit=50`); NEWS_CACHE = data.articles || []; renderNews(); }
+  catch (e) { body.innerHTML = `<div class="err">Error loading news: ${e.message}</div>`; }
+}
+function renderNews() {
+  const body = document.getElementById('body-news');
+  if (!NEWS_CACHE) return;
+  let articles = NEWS_CACHE;
+  if (newsToggle.checked) {
+    const favIds = new Set(FAVORITES.map(f => f.id));
+    if (!favIds.size) { body.innerHTML = `<div class="empty">Add a favorite team above to filter news by it.</div>`; return; }
+    articles = articles.filter(a => a.categories?.some(c => c.type === 'team' && favIds.has(String(c.teamId))));
+  }
+  if (!articles.length) { body.innerHTML = `<div class="empty">No news ${newsToggle.checked ? 'about your favorite teams ' : ''}right now.</div>`; return; }
+  body.innerHTML = articles.map(a => `<div class="news-item">
+      <a href="${a.links?.web?.href || '#'}" target="_blank" rel="noopener">${a.headline}</a>
+      <div class="news-date">${new Date(a.published).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div></div>`).join('');
+}
+
+// ---------- Team modal ----------
+async function openTeamModal(teamId) {
+  const overlay = document.getElementById('teamModal');
+  const modalBody = document.getElementById('modalBody');
+  modalBody.innerHTML = `<div class="loading">Loading team…</div>`; overlay.classList.add('open');
+  try {
+    const [detail, rosterData] = await Promise.all([
+      fetchJSON(`${API}/teams/${teamId}`),
+      fetchJSON(`${API}/teams/${teamId}?enable=roster`).catch(() => null),
+    ]);
+    const t = detail.team;
+    const athletes = (rosterData?.team?.athletes || []).slice().sort((a, b) => (a.jersey ? Number(a.jersey) : 999) - (b.jersey ? Number(b.jersey) : 999));
+    const next = t.nextEvent?.[0];
+    const isFav = FAVORITES.some(f => f.id === teamId);
+    modalBody.innerHTML = `
+      <div class="modal-head"><img src="${t.logos?.[0]?.href || ''}" onerror="this.style.display='none'"><h2>${t.displayName}</h2></div>
+      <div class="modal-sub">${t.standingSummary || t.recordSummary || ''}</div>
+      <div class="modal-links">
+        <a href="${ESPN_SITE}/team/_/id/${t.id}" target="_blank" rel="noopener">ESPN Team Page</a>
+        <span class="team-link" style="cursor:pointer;" onclick="openSchedule('${t.id}')">📅 Full Schedule</span>
+        <span class="team-link" style="cursor:pointer;" onclick="${isFav ? `removeFavorite('${t.id}')` : `addFavoriteFromModal('${t.id}')`}">${isFav ? '★ Remove Favorite' : '☆ Add Favorite'}</span>
+      </div>
+      <div class="modal-section-title">Next Game</div>
+      <div style="font-size:14px;">${next ? `${next.shortName || next.name} — ${nextWhen(next)}` : 'No upcoming game scheduled'}</div>
+      <div class="modal-section-title">Roster ${athletes.length ? `(${athletes.length})` : ''}</div>
+      <div class="roster-list">${athletes.length ? athletes.map(a => `<div><span class="num">#${a.jersey || '-'}</span><a class="player-link" href="${ESPN_SITE}/player/_/id/${a.id}" target="_blank" rel="noopener">${a.displayName}</a>${a.position?.abbreviation ? ` <span style="color:var(--muted);font-size:12px;">${a.position.abbreviation}</span>` : ''}</div>`).join('') : '<div class="empty">Roster not yet posted by ESPN.</div>'}</div>
+      <div class="modal-section-title">Recent Results</div>
+      <div id="modalResults-${t.id}"><div class="loading">Loading results…</div></div>`;
+    loadTeamResults(t.id);
+  } catch (e) { modalBody.innerHTML = `<div class="err">Error loading team: ${e.message}</div>`; }
+}
+async function loadTeamResults(teamId) {
+  const el = document.getElementById(`modalResults-${teamId}`);
+  if (!el) return;
+  try {
+    const data = await fetchJSON(`${API}/teams/${teamId}/schedule`);
+    const events = (data.events || [])
+      .filter(e => e.competitions?.[0]?.status?.type?.name === 'STATUS_FINAL')
+      .sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
+    if (!events.length) { el.innerHTML = `<div class="empty">No completed games yet.</div>`; return; }
+    el.innerHTML = events.map(e => {
+      const comp = e.competitions[0];
+      const me = comp.competitors.find(c => c.team.id === teamId);
+      const opp = comp.competitors.find(c => c.team.id !== teamId);
+      if (!me || !opp) return '';
+      const won = !!me.winner;
+      const ms = me.score?.displayValue ?? me.score ?? '', os = opp.score?.displayValue ?? opp.score ?? '';
+      return `<div class="result-row">
+        <span class="rw ${won ? 'win' : 'loss'}">${won ? 'W' : 'L'}</span>
+        <span class="ropp">${me.homeAway === 'home' ? 'vs' : '@'} ${opp.team.shortDisplayName || opp.team.displayName}</span>
+        <span class="rscore">${ms}-${os}</span>
+        <span class="box-link" style="color:var(--accent-dark);cursor:pointer;font-weight:700;font-size:11px;" onclick="openBoxScoreForEvent('${e.id}')">Box Score</span></div>`;
+    }).join('');
+  } catch (e) { el.innerHTML = `<div class="err">Couldn't load results: ${e.message}</div>`; }
+}
+async function addFavoriteFromModal(teamId) { await addFavorite(teamId); openTeamModal(teamId); }
+function closeModal() { document.getElementById('teamModal').classList.remove('open'); }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSchedule(); closeBoxModal(); closeModal(); } });
+
+// ---------- Full schedule modal ----------
+async function openSchedule(teamId) {
+  const overlay = document.getElementById('scheduleModal');
+  const body = document.getElementById('scheduleModalBody');
+  body.innerHTML = `<div class="loading">Loading schedule…</div>`;
+  overlay.classList.add('open');
+  try {
+    const data = await fetchJSON(`${API}/teams/${teamId}/schedule`);
+    const team = data.team || TEAM_CACHE?.find(t => t.id === teamId) || {};
+    const teamName = team.displayName || team.name || 'Team';
+    const teamLogo = team.logos?.[0]?.href || team.logo || '';
+    const events = (data.events || []).slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+    const rows = events.map(e => {
+      const comp = e.competitions?.[0]; if (!comp) return '';
+      const me = comp.competitors.find(c => c.team.id === teamId);
+      const opp = comp.competitors.find(c => c.team.id !== teamId);
+      if (!me || !opp) return '';
+      const state = comp.status?.type?.state;
+      const final = state === 'post', live = state === 'in';
+      const vs = me.homeAway === 'home' ? 'vs' : '@';
+      const dateStr = new Date(e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const oppLogo = opp.team.logos?.[0]?.href || '';
+      let right;
+      if (final || live) {
+        const ms = me.score?.displayValue ?? me.score ?? '', os = opp.score?.displayValue ?? opp.score ?? '';
+        const won = !!me.winner;
+        const wl = final ? `<span class="rw ${won ? 'win' : 'loss'}">${won ? 'W' : 'L'}</span>` : `<span class="rw" style="color:#c00;">●</span>`;
+        right = `${wl}<span class="rscore">${ms}-${os}</span><span class="sch-box" onclick="openBoxScoreForEvent('${e.id}')">Box</span>`;
+      } else {
+        const tv = tvFromComp(comp);
+        const t = comp.timeValid === false ? 'TBD' : fmtTime(e.date);
+        right = `<span class="sch-time">${t}</span>${tv ? `<span class="sch-tv">📺 ${tv}</span>` : ''}`;
+      }
+      return `<div class="sch-row">
+        <span class="sch-date">${dateStr}</span>
+        <span class="sch-opp"><span class="sch-vs">${vs}</span><img src="${oppLogo}" onerror="this.style.display='none'"><span class="team-link" onclick="openTeamModal('${opp.team.id}')">${opp.team.shortDisplayName || opp.team.displayName}</span></span>
+        <span class="sch-right">${right}</span>
+      </div>`;
+    }).join('');
+    body.innerHTML = `<div class="modal-head"><img src="${teamLogo}" onerror="this.style.display='none'"><h2>${teamName}</h2></div>
+      <div class="modal-sub">Full ${new Date().getFullYear()}–${(new Date().getFullYear()+1).toString().slice(2)} schedule · times Central</div>
+      <div class="sch-list">${rows || '<div class="empty">No schedule available yet.</div>'}</div>`;
+  } catch (e) { body.innerHTML = `<div class="err">Couldn't load schedule: ${e.message}</div>`; }
+}
+function closeSchedule() { document.getElementById('scheduleModal').classList.remove('open'); }
+
+// ---------- Box score (ESPN per-player — clean, no proxy) ----------
+async function openBoxScoreForEvent(eventId) {
+  // ensure a minimal event shell exists for header rendering
+  if (!EVENT_CACHE[eventId]) {
+    try {
+      const sum = await fetchJSON(`${API}/summary?event=${eventId}`);
+      SUMMARY_CACHE[eventId] = sum;
+      const comp = sum.header.competitions[0];
+      comp.competitors.forEach(c => { c.team.logo = c.team.logos?.[0]?.href || ''; c.team.shortDisplayName = c.team.shortDisplayName || c.team.nickname || c.team.displayName; });
+      comp.venue = sum.gameInfo?.venue; comp.attendance = sum.gameInfo?.attendance;
+      EVENT_CACHE[eventId] = { id: eventId, competitions: [comp] };
+    } catch (e) {}
+  }
+  openBoxScore(eventId);
+}
+async function openBoxScore(eventId) {
+  const overlay = document.getElementById('boxModal');
+  const body = document.getElementById('boxModalBody');
+  body.innerHTML = `<div class="loading">Loading box score…</div>`; overlay.classList.add('open');
+  let headerHtml = '';
+  try {
+    const event = EVENT_CACHE[eventId];
+    const comp = event?.competitions?.[0];
+    const home = comp?.competitors?.find(c => c.homeAway === 'home');
+    const away = comp?.competitors?.find(c => c.homeAway === 'away');
+    if (home && away) {
+      headerHtml = `<div class="box-header">
+          <div class="bh-team"><img src="${away.team.logo || away.team.logos?.[0]?.href || ''}" onerror="this.style.display='none'">${away.team.shortDisplayName || away.team.abbreviation}<span class="bh-score ${away.winner ? 'win' : ''}">${away.score ?? ''}</span></div>
+          <div style="color:var(--muted);font-weight:700;">${comp.status?.type?.state === 'in' ? (comp.status.type.shortDetail || 'LIVE') : 'FINAL'}</div>
+          <div class="bh-team"><img src="${home.team.logo || home.team.logos?.[0]?.href || ''}" onerror="this.style.display='none'">${home.team.shortDisplayName || home.team.abbreviation}<span class="bh-score ${home.winner ? 'win' : ''}">${home.score ?? ''}</span></div>
+        </div>`;
+    }
+    body.innerHTML = headerHtml + `<div class="loading">Loading player stats…</div>`;
+
+    const sum = SUMMARY_CACHE[eventId] || await fetchJSON(`${API}/summary?event=${eventId}`);
+    SUMMARY_CACHE[eventId] = sum;
+    const gi = sum.gameInfo || {};
+    const venueName = gi.venue?.fullName;
+    const city = gi.venue?.address ? [gi.venue.address.city, gi.venue.address.state].filter(Boolean).join(', ') : '';
+    const att = Number(gi.attendance) || 0;
+    const officials = (gi.officials || []).map(o => o.displayName || o.fullName).filter(Boolean);
+    const metaBits = [];
+    if (venueName) metaBits.push(`<a href="https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(venueName)}&go=Go" target="_blank" rel="noopener">${venueName}</a>${city ? ' · ' + city : ''}`);
+    if (att > 0) metaBits.push(`${ATT_ICON}${att.toLocaleString()}`);
+    const bxTv = tvFromComp(sum.header?.competitions?.[0]);
+    if (bxTv) metaBits.push(`📺 ${bxTv}`);
+    const metaLine = metaBits.length ? `<div class="box-meta-line">${metaBits.join(' &nbsp;·&nbsp; ')}</div>` : '';
+    const offLine = officials.length ? `<div class="box-meta-line"><strong>Officials:</strong> ${officials.join(', ')}</div>` : '';
+
+    const players = sum.boxscore?.players || [];
+    if (!players.length) {
+      body.innerHTML = headerHtml + metaLine + offLine + `<div class="empty" style="text-align:center;margin-top:10px;">Player box score not available for this game yet.</div>`;
+      return;
+    }
+    body.innerHTML = headerHtml + metaLine + offLine + players.map(renderBoxTeam).join('') +
+      `<div class="box-source-note">Player stats via ESPN. MIN=Minutes PTS=Points REB=Rebounds AST=Assists STL=Steals BLK=Blocks TO=Turnovers PF=Fouls</div>`;
+  } catch (e) {
+    body.innerHTML = headerHtml + `<div class="err" style="margin-top:10px;">Couldn't load box score (${e.message}). <span class="box-link" style="color:var(--accent-dark);cursor:pointer;" onclick="openBoxScore('${eventId}')">Try again</span></div>`;
+  }
+}
+// Columns we show, in order, mapped from ESPN's labels array.
+const BOX_COLS = ['MIN', 'PTS', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF', 'FG', '3PT', 'FT'];
+function renderBoxTeam(teamBlock) {
+  const stat = teamBlock.statistics?.[0];
+  if (!stat) return '';
+  const labels = stat.labels || [];
+  const idx = {}; BOX_COLS.forEach(c => { idx[c] = labels.indexOf(c); });
+  const header = `<tr><th style="text-align:left;">Player</th>${BOX_COLS.map(c => `<th>${c}</th>`).join('')}</tr>`;
+  const cell = (stats, c) => (idx[c] >= 0 && stats && stats[idx[c]] != null) ? stats[idx[c]] : '';
+  const rowFor = (a, cls) => {
+    const ath = a.athlete || {};
+    const name = ath.displayName || '';
+    const nameHtml = ath.id ? `<a class="player-link" href="${ESPN_SITE}/player/_/id/${ath.id}" target="_blank" rel="noopener">${name}</a>` : name;
+    return `<tr class="${cls || ''}"><td>${nameHtml}${a.starter ? ' <span style="color:var(--muted);font-size:10px;">GS</span>' : ''}</td>${BOX_COLS.map(c => `<td>${cell(a.stats, c)}</td>`).join('')}</tr>`;
+  };
+  const athletes = (stat.athletes || []).filter(a => !a.didNotPlay && a.stats && a.stats.length);
+  const totalsRow = stat.totals && stat.totals.length
+    ? `<tr class="tot-row"><td>Team</td>${BOX_COLS.map(c => `<td>${cell(stat.totals, c)}</td>`).join('')}</tr>` : '';
+  return `<div class="box-team-block">
+    <div class="box-team-title"><img src="${teamBlock.team?.logo || teamBlock.team?.logos?.[0]?.href || ''}" onerror="this.style.display='none'">${teamBlock.team?.displayName || ''}</div>
+    <div class="stat-table-wrap"><table class="stat-table"><thead>${header}</thead>
+      <tbody>${athletes.map(a => rowFor(a)).join('')}${totalsRow}</tbody></table></div></div>`;
+}
+function closeBoxModal() { document.getElementById('boxModal').classList.remove('open'); }
+
+// ---------- init ----------
+const VERSION = '1.0';
+function updateSubtitle() {
+  document.getElementById('subtitle').textContent =
+    'Scores, rankings, standings & rosters — updated ' +
+    new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + ' · v' + VERSION;
+}
+async function init() {
+  updateSubtitle(); wireMyTeamsSortable(); applySavedLayout(); applySavedCollapsed(); wireSortable();
+  document.querySelector('.subtab-btn[data-range="today"]').classList.add('active');
+  await ensureTeamCache();
+  populateConfTeamSelect();
+  loadMyTeams(); loadScores(); loadRankings(); loadStandings(); loadNews();
+}
+init();
+setInterval(() => { loadScores(); updateSubtitle(); }, 60000);
+</script>
+</body>
+</html>
